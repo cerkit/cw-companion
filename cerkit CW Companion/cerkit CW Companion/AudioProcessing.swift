@@ -1,6 +1,7 @@
 import AVFoundation
 import Combine
 import Foundation
+import ScreenCaptureKit
 
 class AudioModel: ObservableObject {
     @Published var decodedText: String = ""
@@ -21,6 +22,142 @@ class AudioModel: ObservableObject {
     // Transmission
     private let encoder = MorseEncoder()
     private let generator = AudioGenerator()
+
+    // Live Capture
+    let captureManager = AudioCaptureManager()
+    private let streamingDecoder = StreamingMorseDecoder()
+
+    // Live Processing State
+    private var isLiveListening = false
+    private var liveStartTime: AVAudioTime?
+    // Envelope State for Live Streaming
+    private var liveEnvelope: Float = 0.0
+    private var liveIsSignalOn: Bool = false
+    private var liveStateDurationFrames: Int = 0
+
+    init() {
+        captureManager.setAudioCallback { [weak self] buffer in
+            self?.processLiveBuffer(buffer)
+        }
+
+        // Propagate changes from nested ObservableObject
+        captureManager.objectWillChange
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+    }
+
+    private var cancellables = Set<AnyCancellable>()
+
+    func startLiveListening(window: SCWindow) async {
+        self.stopAudio()
+        self.decodedText = ""
+        self.statusMessage =
+            "Listening to \(window.owningApplication?.applicationName ?? "Window")..."
+        DispatchQueue.main.async {
+            self.isLiveListening = true
+            self.isProcessing = true
+        }
+
+        // Reset decoder state
+        streamingDecoder.setWPM(20.0)  // Or dynamic?
+        liveEnvelope = 0.0
+        liveIsSignalOn = false
+        liveStateDurationFrames = 0
+
+        do {
+            try await captureManager.startStream(window: window)
+        } catch {
+            DispatchQueue.main.async {
+                self.statusMessage = "Capture failed: \(error.localizedDescription)"
+                self.isLiveListening = false
+                self.isProcessing = false
+            }
+        }
+    }
+
+    func stopLiveListening() async {
+        await captureManager.stopStream()
+        DispatchQueue.main.async {
+            self.isLiveListening = false
+            self.isProcessing = false
+            self.statusMessage = "Live listening stopped."
+        }
+    }
+
+    private func processLiveBuffer(_ buffer: AVAudioPCMBuffer) {
+        guard isLiveListening else { return }
+        guard let floatChannelData = buffer.floatChannelData else { return }
+
+        // Similar logic to extractDurations but stateful across buffers
+        let frameCount = Int(buffer.frameLength)
+        let samples = floatChannelData[0]
+        let sampleRate = buffer.format.sampleRate
+
+        let threshold: Float = 0.01  // Lowered for sensitivity
+        let decay = Float(exp(-1.0 / (sampleRate * 0.005)))
+
+        var newText = ""
+
+        // Lock for thread safety if needed, but we are just appending text
+        // Note: Audio callback is on global queue.
+
+        for i in 0..<frameCount {
+            let absVal = abs(samples[i])
+
+            // Envelope
+            if absVal > liveEnvelope {
+                liveEnvelope = absVal
+            } else {
+                liveEnvelope *= decay
+            }
+
+            let nowOn = liveEnvelope > threshold
+
+            if nowOn == liveIsSignalOn {
+                liveStateDurationFrames += 1
+            } else {
+                // State Changed!
+                // Calculate duration of PREVIOUS state
+                let durationSecs = Double(liveStateDurationFrames) / sampleRate
+
+                // Filter glitches
+                if durationSecs > 0.005 {
+                    // Valid previous state
+                    if let char = streamingDecoder.processEvent(
+                        duration: durationSecs, isOn: liveIsSignalOn)
+                    {
+                        newText += char
+                    }
+
+                    // Start new state
+                    liveIsSignalOn = nowOn
+                    liveStateDurationFrames = 0
+                } else {
+                    // Glitch: Ignore transition.
+                    liveStateDurationFrames += 1
+                }
+            }
+        }
+
+        // Update UI periodically, not every sample
+        if !newText.isEmpty {
+            DispatchQueue.main.async {
+                self.decodedText += newText
+            }
+        }
+
+        // Check timeout
+        if !liveIsSignalOn {
+            let currentSilence = Double(liveStateDurationFrames) / sampleRate
+            if let timeoutChar = streamingDecoder.checkTimeout(silenceDuration: currentSilence) {
+                DispatchQueue.main.async {
+                    self.decodedText += timeoutChar
+                }
+            }
+        }
+    }
 
     func loadAndProcessAudio(url: URL) {
         self.isProcessing = true
