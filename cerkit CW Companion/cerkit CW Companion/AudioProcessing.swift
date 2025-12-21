@@ -6,6 +6,7 @@ class AudioModel: ObservableObject {
     @Published var decodedText: String = ""
     @Published var isProcessing: Bool = false
     @Published var isPlaying: Bool = false
+    @Published var isReadyToPlay: Bool = false
     @Published var statusMessage: String = "Ready to load audio."
 
     // Playback
@@ -17,8 +18,13 @@ class AudioModel: ObservableObject {
     private var timedDecodedEvents: [(String, TimeInterval)] = []
     private var nextEventIndex = 0
 
+    // Transmission
+    private let encoder = MorseEncoder()
+    private let generator = AudioGenerator()
+
     func loadAndProcessAudio(url: URL) {
         self.isProcessing = true
+        self.isReadyToPlay = false
         self.statusMessage = "Loading audio..."
         self.decodedText = ""  // Clear previous text
         self.stopAudio()  // Stop any current playback
@@ -65,6 +71,7 @@ class AudioModel: ObservableObject {
                     self.timedDecodedEvents = timedEvents
                     self.statusMessage = "Ready. (Est. \(Int(estimatedWpm)) WPM)"
                     self.isProcessing = false
+                    self.isReadyToPlay = true
                 }
 
             } catch {
@@ -74,6 +81,11 @@ class AudioModel: ObservableObject {
                 }
             }
         }
+    }
+
+    func generateAudio(from text: String, wpm: Double = 20.0, frequency: Double = 600.0) -> Data? {
+        let events = encoder.encode(text: text, wpm: wpm)
+        return generator.generateWAV(from: events, frequency: frequency)
     }
 
     func playAudio() {

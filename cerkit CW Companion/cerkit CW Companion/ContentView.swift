@@ -10,31 +10,100 @@ import UniformTypeIdentifiers
 
 struct ContentView: View {
     @StateObject private var audioModel = AudioModel()
+
+    // Receive Tab State
     @State private var isImporterPresented = false
 
+    // Transmit Tab State
+    @State private var transmitText: String = ""
+    @State private var isExporterPresented = false
+    @State private var generatedWAVData: Data?
+    @State private var lastExportURL: URL?
+
     var body: some View {
-        VStack(spacing: 20) {
-            Text("cerkit CW Companion")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-                .padding(.top)
+        TabView {
+            // MARK: - RECEIVE TAB
+            VStack(spacing: 20) {
+                Text("Receive Mode")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .padding(.top)
 
-            // Status Area
-            HStack {
-                Text("Status:")
-                    .fontWeight(.semibold)
-                Text(audioModel.statusMessage)
-                    .foregroundColor(.secondary)
+                // Status Area
+                HStack {
+                    Text("Status:")
+                        .fontWeight(.semibold)
+                    Text(audioModel.statusMessage)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal)
+
+                // Output Area
+                VStack(alignment: .leading) {
+                    Text("Decoded Message:")
+                        .font(.headline)
+                        .padding(.bottom, 5)
+
+                    TextEditor(text: .constant(audioModel.decodedText))
+                        .font(.system(.body, design: .monospaced))
+                        .padding(5)
+                        .background(Color(nsColor: .textBackgroundColor))
+                        .cornerRadius(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                        )
+                }
+                .padding()
+
+                // Controls
+                HStack {
+                    Button(action: {
+                        isImporterPresented = true
+                    }) {
+                        Label("Load Audio (.wav)", systemImage: "waveform.circle")
+                    }
+                    .disabled(audioModel.isProcessing || audioModel.isPlaying)
+
+                    Spacer()
+
+                    if audioModel.isPlaying {
+                        Button(action: {
+                            audioModel.stopAudio()
+                        }) {
+                            Label("Stop", systemImage: "stop.fill")
+                        }
+                    } else {
+                        Button(action: {
+                            audioModel.playAudio()
+                        }) {
+                            Label("Play", systemImage: "play.fill")
+                        }
+                        .disabled(!audioModel.isReadyToPlay)
+                    }
+
+                    if audioModel.isProcessing {
+                        ProgressView()
+                            .scaleEffect(0.5)
+                    }
+                }
+                .padding(.bottom)
             }
-            .padding(.horizontal)
+            .tabItem {
+                Label("Receive", systemImage: "antenna.radiowaves.left.and.right")
+            }
 
-            // Output Area
-            VStack(alignment: .leading) {
-                Text("Decoded Message:")
-                    .font(.headline)
-                    .padding(.bottom, 5)
+            // MARK: - TRANSMIT TAB
+            VStack(spacing: 20) {
+                Text("Transmit Mode")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .padding(.top)
 
-                TextEditor(text: .constant(audioModel.decodedText))
+                Text("Enter text to encode (20 WPM @ 600Hz)")
+                    .foregroundColor(.secondary)
+
+                TextEditor(text: $transmitText)
                     .font(.system(.body, design: .monospaced))
                     .padding(5)
                     .background(Color(nsColor: .textBackgroundColor))
@@ -43,43 +112,32 @@ struct ContentView: View {
                         RoundedRectangle(cornerRadius: 8)
                             .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                     )
-            }
-            .padding()
+                    .padding()
 
-            // Controls
-            HStack {
-                Button(action: {
-                    isImporterPresented = true
-                }) {
-                    Label("Load Audio File (.wav)", systemImage: "waveform.circle")
-                }
-                .disabled(audioModel.isProcessing || audioModel.isPlaying)
-
-                Spacer()
-
-                if audioModel.isPlaying {
+                HStack {
                     Button(action: {
-                        audioModel.stopAudio()
+                        // Generate
+                        if let data = audioModel.generateAudio(
+                            from: transmitText, wpm: 20.0, frequency: 600.0)
+                        {
+                            generatedWAVData = data
+                            isExporterPresented = true
+                        }
                     }) {
-                        Label("Stop", systemImage: "stop.fill")
+                        Label("Generate & Save .wav", systemImage: "square.and.arrow.up")
                     }
-                } else {
-                    Button(action: {
-                        audioModel.playAudio()
-                    }) {
-                        Label("Play", systemImage: "play.fill")
-                    }
-                    .disabled(audioModel.isProcessing)
+                    .disabled(transmitText.isEmpty)
                 }
-
-                if audioModel.isProcessing {
-                    ProgressView()
-                        .scaleEffect(0.5)
-                }
+                .padding(.bottom)
             }
-            .padding(.bottom)
+            .tabItem {
+                Label("Transmit", systemImage: "waveform.path.ecg")
+            }
         }
-        .frame(minWidth: 500, minHeight: 400)
+        .padding()
+        .frame(minWidth: 600, minHeight: 450)
+
+        // MARK: - File Handling
         .fileImporter(
             isPresented: $isImporterPresented,
             allowedContentTypes: [UTType.wav],
@@ -92,6 +150,34 @@ struct ContentView: View {
                 audioModel.statusMessage = "Error selecting file: \(error.localizedDescription)"
             }
         }
+        .fileExporter(
+            isPresented: $isExporterPresented,
+            document: PCMFile(data: generatedWAVData),
+            contentType: UTType.wav,
+            defaultFilename: "morse_message.wav"
+        ) { result in
+            // Handle save result if needed
+        }
+    }
+}
+
+// Helper struct for FileExporter
+struct PCMFile: FileDocument {
+    static var readableContentTypes: [UTType] { [.wav] }
+
+    var data: Data?
+
+    init(data: Data?) {
+        self.data = data
+    }
+
+    init(configuration: ReadConfiguration) throws {
+        // We don't read with this
+        data = nil
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        return FileWrapper(regularFileWithContents: data ?? Data())
     }
 }
 
