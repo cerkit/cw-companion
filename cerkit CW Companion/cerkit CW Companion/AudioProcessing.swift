@@ -3,6 +3,56 @@ import Combine
 import Foundation
 import ScreenCaptureKit
 
+// Simple Biquad Filter implementation
+class BiquadFilter {
+    // Coefficients
+    private var c_b0: Double = 0.0
+    private var c_b1: Double = 0.0
+    private var c_b2: Double = 0.0
+    private var c_a1: Double = 0.0
+    private var c_a2: Double = 0.0
+
+    // State history
+    private var x1: Double = 0.0  // x[n-1]
+    private var x2: Double = 0.0  // x[n-2]
+    private var y1: Double = 0.0  // y[n-1]
+    private var y2: Double = 0.0  // y[n-2]
+
+    func configure(frequency: Double, sampleRate: Double, q: Double) {
+        let w0 = 2.0 * Double.pi * frequency / sampleRate
+        let tSin = sin(w0)
+        let tCos = cos(w0)
+        let alpha = tSin / (2.0 * q)
+
+        let b0 = alpha
+        let b1 = 0.0
+        let b2 = -alpha
+        let a0 = 1.0 + alpha
+        let a1 = -2.0 * tCos
+        let a2 = 1.0 - alpha
+
+        c_b0 = b0 / a0
+        c_b1 = b1 / a0
+        c_b2 = b2 / a0
+        c_a1 = a1 / a0
+        c_a2 = a2 / a0
+    }
+
+    func processSample(_ sample: Float) -> Float {
+        let x = Double(sample)
+        // y[n] = b0*x[n] + b1*x[n-1] + b2*x[n-2] - a1*y[n-1] - a2*y[n-2]
+        let y = c_b0 * x + c_b1 * x1 + c_b2 * x2 - c_a1 * y1 - c_a2 * y2
+
+        // Shift history
+        x2 = x1
+        x1 = x
+        y2 = y1
+        y1 = y
+
+        return Float(y)
+    }
+}
+
 class AudioModel: ObservableObject {
     @Published var decodedText: String = ""
     @Published var isProcessing: Bool = false
@@ -26,6 +76,10 @@ class AudioModel: ObservableObject {
     // Live Capture
     let captureManager = AudioCaptureManager()
     private let streamingDecoder = StreamingMorseDecoder()
+
+    // Filter
+    private let bandpassFilter = BiquadFilter()
+    private var filterConfigured = false
 
     // Live Processing State
     private var isLiveListening = false
@@ -65,6 +119,7 @@ class AudioModel: ObservableObject {
         liveEnvelope = 0.0
         liveIsSignalOn = false
         liveStateDurationFrames = 0
+        filterConfigured = false  // Re-configure filter for new stream
 
         do {
             try await captureManager.startStream(window: window)
@@ -95,6 +150,13 @@ class AudioModel: ObservableObject {
         let samples = floatChannelData[0]
         let sampleRate = buffer.format.sampleRate
 
+        // Configure Filter if needed
+        if !filterConfigured {
+            // Target 600Hz, Q=5.0 for a decent passband
+            bandpassFilter.configure(frequency: 600.0, sampleRate: sampleRate, q: 5.0)
+            filterConfigured = true
+        }
+
         let threshold: Float = 0.01  // Lowered for sensitivity
         let decay = Float(exp(-1.0 / (sampleRate * 0.005)))
 
@@ -104,7 +166,10 @@ class AudioModel: ObservableObject {
         // Note: Audio callback is on global queue.
 
         for i in 0..<frameCount {
-            let absVal = abs(samples[i])
+            let rawSample = samples[i]
+            let filteredSample = bandpassFilter.processSample(rawSample)
+
+            let absVal = abs(filteredSample)
 
             // Envelope
             if absVal > liveEnvelope {
