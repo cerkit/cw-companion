@@ -75,3 +75,141 @@ class MorseDecoder {
         return results
     }
 }
+
+class StreamingMorseDecoder {
+    private let morseCodeMap: [String: String]
+    private var wpm: Double
+    private var unitTime: Double
+
+    // State
+    private var currentSymbol = ""
+    private var lastCharacterEmitted = false  // Track if we just finished a char to avoid dupe spaces
+
+    init(wpm: Double = 20.0) {
+        // Copy the map from the main decoder for convenience, or static lookup.
+        // For now, hardcoding/duplicating or we could make map public static.
+        self.morseCodeMap = [
+            ".-": "A", "-...": "B", "-.-.": "C", "-..": "D", ".": "E",
+            "..-.": "F", "--.": "G", "....": "H", "..": "I", ".---": "J",
+            "-.-": "K", ".-..": "L", "--": "M", "-.": "N", "---": "O",
+            ".--.": "P", "--.-": "Q", ".-.": "R", "...": "S", "-": "T",
+            "..-": "U", "...-": "V", ".--": "W", "-..-": "X", "-.--": "Y",
+            "--..": "Z",
+            ".----": "1", "..---": "2", "...--": "3", "....-": "4", ".....": "5",
+            "-....": "6", "--...": "7", "---..": "8", "----.": "9", "-----": "0",
+            ".-.-.-": ".", "--..--": ",", "..--..": "?", "-..-.": "/", "-....-": "-",
+            "-.--.": "(", "-.--.-": ")",
+        ]
+        self.wpm = wpm
+        self.unitTime = 1.2 / wpm
+    }
+
+    func setWPM(_ wpm: Double) {
+        self.wpm = wpm
+        self.unitTime = 1.2 / wpm
+    }
+
+    /// Processes a completed state (beep or silence) and returns any decoded text.
+    func processEvent(duration: Double, isOn: Bool) -> String? {
+        let dotLimit = unitTime * 1.5
+        let symbolSpaceLimit = unitTime * 2.0
+        let wordSpaceLimit = unitTime * 5.0
+
+        if isOn {
+            // A signal just finished. Was it a dot or a dash?
+            if duration < dotLimit {
+                currentSymbol += "."
+            } else {
+                currentSymbol += "-"
+            }
+            lastCharacterEmitted = false
+            return nil
+
+        } else {
+            // A silence just finished. What does it mean?
+            // If silence was short (intra-char), do nothing.
+            // If silence was medium (inter-char), emit currentSymbol.
+            // If silence was long (word), emit currentSymbol + space.
+
+            // NOTE: This is called when silence ENDS (next beep started).
+            // But we also need to handle "timeout" (silence continues).
+            // This method handles the "Next beep just started" case.
+
+            var output = ""
+
+            if duration > wordSpaceLimit {
+                // We definitely finished a word.
+                // Did we have a pending character?
+                if !currentSymbol.isEmpty, let char = morseCodeMap[currentSymbol] {
+                    output += char
+                }
+                currentSymbol = ""
+                output += " "
+                lastCharacterEmitted = true
+
+            } else if duration > symbolSpaceLimit {
+                // Finished a character.
+                if !currentSymbol.isEmpty, let char = morseCodeMap[currentSymbol] {
+                    output += char
+                }
+                currentSymbol = ""
+                lastCharacterEmitted = true
+            }
+
+            return output.isEmpty ? nil : output
+        }
+    }
+
+    /// Called periodically to check if the CURRENT ongoing silence constitutes a character/word break.
+    func checkTimeout(silenceDuration: Double) -> String? {
+        // If we are in the middle of a symbol, and silence is long enough, finalize it.
+        let symbolSpaceLimit = unitTime * 2.0
+        let wordSpaceLimit = unitTime * 5.0
+
+        // If silence > wordSpaceLimit and we haven't emitted the trailing space yet...
+        if silenceDuration > wordSpaceLimit {
+            var output = ""
+
+            // 1. Flush character if pending
+            if !currentSymbol.isEmpty {
+                if let char = morseCodeMap[currentSymbol] {
+                    output += char
+                }
+                currentSymbol = ""
+            }
+
+            // 2. Emit space if we haven't already (and if we actually outputted something previously)
+            // But this function might be called repeatedly. We don't want "       ".
+            // We need to track state.
+            // Simplification: This returns text ONE TIME when the threshold is crossed.
+            // But how do we know if we crossed it just now?
+            // Logic handled by caller potentially, OR we statefully track "I am waiting for word space".
+
+            // Re-think: This is tricky to call "repeatedly".
+            // Caller should probably call `processEvent` when state *changes*.
+            // This function is for "User stopped typing".
+
+            // Let's rely on `currentSymbol` presence.
+            if !output.isEmpty {
+                output += " "
+                return output
+            }
+
+            // If we already flushed char, but silence keeps growing into a word space?
+            // We need to emit " ".
+            // This requires separate tracking. A bit complex for single pass.
+            // For now: Only flush pending CHARACTERS. Phase 3 MVP.
+            return nil
+
+        } else if silenceDuration > symbolSpaceLimit {
+            if !currentSymbol.isEmpty {
+                if let char = morseCodeMap[currentSymbol] {
+                    currentSymbol = ""
+                    return char
+                }
+            }
+        }
+
+        return nil
+    }
+}
