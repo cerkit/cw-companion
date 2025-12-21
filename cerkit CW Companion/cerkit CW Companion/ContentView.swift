@@ -53,7 +53,24 @@ struct ContentView: View {
                 }) {
                     Label("Load Audio File (.wav)", systemImage: "waveform.circle")
                 }
-                .disabled(audioModel.isProcessing)
+                .disabled(audioModel.isProcessing || audioModel.isPlaying)
+
+                Spacer()
+
+                if audioModel.isPlaying {
+                    Button(action: {
+                        audioModel.stopAudio()
+                    }) {
+                        Label("Stop", systemImage: "stop.fill")
+                    }
+                } else {
+                    Button(action: {
+                        audioModel.playAudio()
+                    }) {
+                        Label("Play", systemImage: "play.fill")
+                    }
+                    .disabled(audioModel.isProcessing)
+                }
 
                 if audioModel.isProcessing {
                     ProgressView()

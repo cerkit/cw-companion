@@ -12,68 +12,66 @@ class MorseDecoder {
         ".----": "1", "..---": "2", "...--": "3", "....-": "4", ".....": "5",
         "-....": "6", "--...": "7", "---..": "8", "----.": "9", "-----": "0",
         ".-.-.-": ".", "--..--": ",", "..--..": "?", "-..-.": "/", "-....-": "-",
-        "-.--.": "(", "-.--.-": ")"
+        "-.--.": "(", "-.--.-": ")",
     ]
-    
+
     // Configurable WPM parameters (approximations)
     // Standard Morse: Dot = 1 unit, Dash = 3 units
     // Intra-char space = 1 unit, Inter-char space = 3 units, Word space = 7 units
-    
+
     /// Decodes a sequence of on/off durations into text.
-    /// - Parameters:
-    ///   - onOffPairs: An array of tuples/structs (duration, isOn).
-    ///   - wpm: Estimated Words Per Minute to calibrate timing thresholds.
     func decode(durations: [(Double, Bool)], wpm: Double = 20.0) -> String {
-        // Calculate timing unit (dot length) in seconds based on WPM
-        // Standard: T = 1.2 / WPM
+        return decodeWithTimestamps(durations: durations, wpm: wpm).map { $0.0 }.joined()
+    }
+
+    /// Decodes with timestamps for each character.
+    /// - Returns: Array of (CharacterString, EndTimeInterval)
+    func decodeWithTimestamps(durations: [(Double, Bool)], wpm: Double = 20.0) -> [(
+        String, TimeInterval
+    )] {
         let unitTime = 1.2 / wpm
-        
-        let dotLimit = unitTime * 1.5 // Cutoff between dot and dash
-        // let dashLimit = unitTime * 4.0 // (Not strictly needed if > dotLimit is dash)
-        
-        let symbolSpaceLimit = unitTime * 2.0 // Cutoff between intra-char and inter-char
-        let wordSpaceLimit = unitTime * 5.0 // Cutoff between char space and word space
-        
+        let dotLimit = unitTime * 1.5
+        let symbolSpaceLimit = unitTime * 2.0
+        let wordSpaceLimit = unitTime * 5.0
+
         var currentSymbol = ""
-        var fullMessage = ""
-        
+        var accumulatedTime: TimeInterval = 0
+        var results: [(String, TimeInterval)] = []
+
         for (duration, isOn) in durations {
+            accumulatedTime += duration
+
             if isOn {
-                // Signal ON: Determine Dot or Dash
                 if duration < dotLimit {
                     currentSymbol += "."
                 } else {
                     currentSymbol += "-"
                 }
             } else {
-                // Signal OFF: Determine Space type
                 if duration > wordSpaceLimit {
-                    // Word boundary
+                    // Word boundary (implies character boundary first)
                     if let char = morseCodeMap[currentSymbol] {
-                        fullMessage += char
+                        results.append((char, accumulatedTime))
                     }
-                    if !fullMessage.isEmpty && !fullMessage.hasSuffix(" ") {
-                         fullMessage += " "
+                    if !results.isEmpty && results.last?.0 != " " {
+                        results.append((" ", accumulatedTime))
                     }
                     currentSymbol = ""
                 } else if duration > symbolSpaceLimit {
                     // Character boundary
                     if let char = morseCodeMap[currentSymbol] {
-                        fullMessage += char
+                        results.append((char, accumulatedTime))
                     }
                     currentSymbol = ""
-                } else {
-                    // Intra-character space (between dots/dashes of same letter)
-                    // Do nothing, just waiting for next beep
                 }
             }
         }
-        
-        // Catch trailing character
+
+        // Trailing char
         if !currentSymbol.isEmpty, let char = morseCodeMap[currentSymbol] {
-            fullMessage += char
+            results.append((char, accumulatedTime))
         }
-        
-        return fullMessage
+
+        return results
     }
 }
