@@ -25,6 +25,9 @@ public class KiwiClient: NSObject, ObservableObject {
     private var hasRequestedAudio: Bool = false
     private let adpcmDecoder: IMAADPCMDecoder? = IMAADPCMDecoder()
 
+    // Local Audio FFT Processor
+    private let spectrogram = AudioSpectrogram(sampleCount: 1024)
+
     public init(host: String, port: Int) {
         self.host = host
         self.port = port
@@ -34,13 +37,13 @@ public class KiwiClient: NSObject, ObservableObject {
     }
 
     public func connect() {
-        print("KiwiClient: Connect method called via \(host):\(port)")
+        self.hasRequestedAudio = false
+        print("KiwiClient: Connect AUDIO method called via \(host):\(port)")
         // KiwiSDR expects: ws://host:port/{timestamp}/{id}
         let timestamp = Int(Date().timeIntervalSince1970 * 1000)
         let idVal = "cw_comp_" + String(Int.random(in: 100...999))
         self.sessionID = idVal
-        // KiwiSDR stream name is 'SND' for audio/spectrum, not the client ID!
-        // Source: kiwi.js -> open_websocket('SND', ...)
+
         let urlString = "ws://\(host):\(port)/ws/kiwi/\(timestamp)/SND"
         print("KiwiClient: Connecting to \(urlString)")
 
@@ -64,7 +67,7 @@ public class KiwiClient: NSObject, ObservableObject {
     }
 
     private func send(command: String) {
-        print("KiwiClient: Sending -> \(command)")
+        // print("KiwiClient: Sending -> \(command)")
         // KiwiSDR expects commands terminated by newline, even in WebSocket frames
         let message = URLSessionWebSocketTask.Message.string(command + "\n")
         webSocketTask?.send(message) { error in
@@ -83,15 +86,10 @@ public class KiwiClient: NSObject, ObservableObject {
                 print("KiwiClient: WebSocket receive error: \(error)")
                 self.cleanupConnection()
             case .success(let message):
-                // Log receiving something!
-                // print("KiwiClient: Received message")
-
                 switch message {
                 case .data(let data):
-                    // print("KiwiClient: Binary data (\(data.count) bytes)")
                     self.handleBinaryMessage(data)
                 case .string(let text):
-                    print("KiwiClient: Text message: \(text)")
                     self.handleTextMessage(text)
                 @unknown default:
                     break
@@ -129,10 +127,6 @@ public class KiwiClient: NSObject, ObservableObject {
                 return
             }
 
-            // Extract RSSI (Bytes 8-9, Little Endian)
-            let rssiData = data.subdata(in: 8..<10)
-            let rssi = rssiData.withUnsafeBytes { $0.load(as: Int16.self) }
-
             // Extract Audio Data (Bytes 10...)
             let audioData = data.dropFirst(10)
 
@@ -141,28 +135,27 @@ public class KiwiClient: NSObject, ObservableObject {
                 // Decode ADPCM
                 samples = decoder.decode(audioData)
             } else {
-                // Fallback simple cast (unlikely valid for ADPCM)
-                let sampleCount = audioData.count / 2
-                samples = [Int16](repeating: 0, count: sampleCount)
-                audioData.withUnsafeBytes { rawBuffer in
-                    if let baseAddress = rawBuffer.baseAddress {
-                        let rawPointer = baseAddress.assumingMemoryBound(to: UInt16.self)
-                        for i in 0..<sampleCount {
-                            let point = rawPointer[i]
-                            samples[i] = Int16(bitPattern: UInt16(littleEndian: point))
-                        }
-                    }
-                }
+                // Fallback / Unknown format
+                samples = []
             }
 
+            // 1. Send Audio to UI/Decoder
             self.audioStream.send(samples)
+
+            // 2. Process for Local Waterfall (FFT)
+            // Ideally we accumulate enough samples for FFT size, but AudioSpectrogram handles windowing?
+            // Actually AudioSpectrogram expects 'sampleCount' (1024) in the process method normally,
+            // or we feed it chunks. Our 'samples' here are small chunks (e.g. 512 or so?).
+            // Let's rely on simple processing: If we pass whatever we get, the FFT might be noisy or partial
+            // if the chunk is small.
+            // For robustness, we might need a circular buffer in KiwiClient or AudioSpectrogram.
+            // But let's try direct feed first.
+            if let spectrum = self.spectrogram.process(samples: samples) {
+                self.spectrumStream.send(spectrum)
+            }
 
         } else if prefix == "MSG" {
             // Metadata / Control
-            // Decode potential text message hidden in binary frame
-            // Format: "MSG" (3) + ?
-
-            // Try to decode the whole thing as string (ignoring first 3 bytes 'MSG')
             if let stringContent = String(data: data.dropFirst(4), encoding: .utf8) {
                 print("KiwiClient: Received MSG packet: '\(stringContent)'")
 

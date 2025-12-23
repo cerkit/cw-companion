@@ -76,6 +76,13 @@ public struct CloudReceiverView: View {
 
             Divider()
 
+            // Waterfall Display
+            MetalWaterfallView(kiwiClient: kiwiClient)
+                .frame(height: 200)
+                .background(Color.black)
+
+            Divider()
+
             // Decoded Traffic List
             List {
                 ForEach(ft8Engine.decodedMessages) { msg in
