@@ -31,6 +31,11 @@ let package = Package(
                 "FT8Engine.swift", "MorseEncoder.swift", "AudioGenerator.swift",
                 "AudioCaptureManager.swift", "CloudReceiverView.swift",
                 "IMAADPCMDecoder.swift", "StreamAudioPlayer.swift",
+                "WaterfallRenderer.swift", "MetalWaterfallView.swift",
+                "AudioSpectrogram.swift",
+            ],
+            resources: [
+                .process("Waterfall.metal")
             ]
         ),
         .testTarget(
