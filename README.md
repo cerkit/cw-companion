@@ -22,6 +22,19 @@ CW Companion is a macOS application designed for Morse Code (CW) enthusiasts. It
 *   **Envelope Shaping**: Applies a 5ms linear rise and fall time (ramp) to every key-down event. This essentially eliminates "key clicks" (spectral splatter) common in simple square-wave generators.
 *   **WAV Export**: Saves the generated Morse code audio to a broadcast-quality `.wav` file for sharing or practice.
 
+### 3. Cloud Receiver (FT8 & Waterfall) 📡
+*   **Public SDR Integration**: Connects to public KiwiSDR receivers (e.g., KPH San Francisco) to monitor radio bands without local hardware.
+*   **Locally Generated Waterfall**:
+    *   **Metal-Accelerated**: Uses **Accelerate (vDSP)** for high-performance FFT and **Metal** for GPU rendering, creating a smooth 60fps spectrogram.
+    *   **Passband Zoom**: Automatically focuses on the active 0-3kHz audio band.
+    *   **Calibrated Visualization**: High-contrast color mapping for easy signal spotting.
+*   **FT8 Decoder**:
+    *   **Live Decoding**: Integrated C-based FT8 decoding engine processes 15-second transmission cycles in real-time.
+    *   **Grid Extraction**: Automatically parses Maidenhead Grid Locators (e.g., "PL02") from decoded messages.
+*   **Global Map Plotter**:
+    *   **Live Visualization**: Plots decoded stations on an interactive **Apple Map** using the extracted grid squares.
+    *   **Split-View Dashboard**: Professional monitoring layout with Map on the left and Waterfall/Data on the right.
+
 ## Technical Architecture
 
 *   **Platform**: macOS 12.3+ (Required for `ScreenCaptureKit`).
