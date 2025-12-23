@@ -12,8 +12,8 @@ public class WaterfallRenderer: NSObject, MTKViewDelegate, ObservableObject {
 
     // Data State
     private let textureHeight = 512
-    private let textureWidth = 512  // Matches FFT size (1024 samples / 2)
-    private var ringBufferIndex: Int = 0  // Line we are writing to (0...511)
+    private let textureWidth = 256  // Zoomed to 0-3kHz Passband (Passband ~3kHz, FFT ~6kHz)
+    private var ringBufferIndex: Int = 0
 
     private var cancellables = Set<AnyCancellable>()
 
@@ -34,7 +34,7 @@ public class WaterfallRenderer: NSObject, MTKViewDelegate, ObservableObject {
     // Public API to ingest data
     public func appendSpectrum(data: [UInt8]) {
         // Data format: [UInt8] bins.
-        // Kiwi sends bins. Length varies (e.g. 1024).
+        // Kiwi sends bins. Length varies (usually 512 from our FFT).
         // Update texture row.
 
         let width = data.count
@@ -42,9 +42,7 @@ public class WaterfallRenderer: NSObject, MTKViewDelegate, ObservableObject {
 
         let writeRow = ringBufferIndex
 
-        // Dynamic resize check could go here, but for now strict 512.
-        // Crop if too large, invalid if too small?
-        // Just take prefix for safety.
+        // Passband Zoom: Take first 256 bins.
         let bytesToCopy = min(width, textureWidth)
         let region = MTLRegionMake2D(0, writeRow, bytesToCopy, 1)
 
@@ -63,19 +61,12 @@ public class WaterfallRenderer: NSObject, MTKViewDelegate, ObservableObject {
     }
 
     private func buildPipeline() {
-        // Load default library from Bundle.module
-        // Note: When using SwiftPM resources, the .metallib is in Bundle.module.
-        // However, standard makeDefaultLibrary() looks in Main Bundle.
-        // We must find the bundle for this class.
-
         var library: MTLLibrary?
         do {
-            // Try Bundle.module if available (SwiftPM)
             let bundle = Bundle.module
             library = try device.makeDefaultLibrary(bundle: bundle)
         } catch {
             print("Could not load library from Bundle.module: \(error)")
-            // Fallback to default (might work if merged)
             library = device.makeDefaultLibrary()
         }
 
@@ -102,18 +93,16 @@ public class WaterfallRenderer: NSObject, MTKViewDelegate, ObservableObject {
         samplerDesc.minFilter = .linear
         samplerDesc.magFilter = .linear
         samplerDesc.sAddressMode = .clampToEdge
-        samplerDesc.tAddressMode = .repeat  // Wrap needed for ring buffer logic? Actually we handle wrap manually in logic, but .repeat is safer for v coords
+        samplerDesc.tAddressMode = .repeat
         samplerState = device.makeSamplerState(descriptor: samplerDesc)
     }
 
     private func buildTextures() {
+        // Texture width matches passband (256)
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: .r8Unorm, width: 512, height: 512, mipmapped: false)
-        descriptor.usage = [.shaderRead, .shaderWrite]  // We write via replaceRegion
+            pixelFormat: .r8Unorm, width: 256, height: 512, mipmapped: false)
+        descriptor.usage = [.shaderRead, .shaderWrite]
         spectrumTexture = device.makeTexture(descriptor: descriptor)
-
-        // Clear to black
-        // (Optional, init is usually 0)
     }
 
     private func buildColorMap() {
@@ -175,7 +164,6 @@ public class WaterfallRenderer: NSObject, MTKViewDelegate, ObservableObject {
         return max(0.0, min(1.0, value))
     }
 
-    // MARK: - Draw
     public func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
 
     public func draw(in view: MTKView) {
@@ -209,8 +197,6 @@ public class WaterfallRenderer: NSObject, MTKViewDelegate, ObservableObject {
             1, 0,
             0, 0,
         ]
-        // Note: Our shader logic assumes v=0 is "Newest" (top).
-        // Since we draw a quad, v=0 is top. v=1 is bottom. Matches.
 
         renderEncoder.setVertexBytes(
             vertices, length: vertices.count * MemoryLayout<Float>.size, index: 0)
@@ -220,6 +206,7 @@ public class WaterfallRenderer: NSObject, MTKViewDelegate, ObservableObject {
         var offsetUniform = Float(ringBufferIndex) / Float(textureHeight)
         renderEncoder.setFragmentBytes(&offsetUniform, length: MemoryLayout<Float>.size, index: 0)
 
+        // Note: index 0 and 1 must match shader slots.
         renderEncoder.setFragmentTexture(spectrumTexture, index: 0)
         renderEncoder.setFragmentTexture(colorMapTexture, index: 1)
         renderEncoder.setFragmentSamplerState(samplerState, index: 0)

@@ -42,15 +42,13 @@ fragment float4 waterfallFragment(VertexOut in [[stage_in]],
     float ringCoord = offset - v;
     if (ringCoord < 0.0) { ringCoord += 1.0; }
     
-    // U is just frequency (maybe flip if needed)
+    // Default Orientation: Frequency = X, Time = Y (Vertical Scroll)
     float u = in.texCoord.x;
     
-    // Sample magnitude
+    // Revert Rotation: float2(u, ringCoord)
     float magnitude = spectrumTexture.sample(textureSampler, float2(u, ringCoord)).r;
     
-    // Apply Gain to lift signals out of noise floor
-    // Values seem to be low (near 0). Let's boost meaningful range.
-    magnitude = saturate(magnitude * 5.0);
+    magnitude = saturate(magnitude);
     
     // Map to Color
     float4 color = colorMap.sample(textureSampler, magnitude);
