@@ -5,6 +5,7 @@
 //  Created by Michael Earls on 12/21/25.
 //
 
+import CerkitCWCompanionLogic
 import ScreenCaptureKit
 import SwiftUI
 import UniformTypeIdentifiers
@@ -212,6 +213,12 @@ struct ContentView: View {
             .tabItem {
                 Label("Transmit", systemImage: "waveform.path.ecg")
             }
+
+            // MARK: - CLOUD FT8 TAB
+            CloudReceiverView()
+                .tabItem {
+                    Label("Cloud FT8", systemImage: "globe")
+                }
         }
         .padding()
         .frame(minWidth: 600, minHeight: 450)

@@ -1,0 +1,4 @@
+module ft8_lib {
+    umbrella header "ft8_lib.h"
+    export *
+}

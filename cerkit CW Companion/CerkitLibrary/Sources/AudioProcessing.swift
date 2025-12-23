@@ -53,12 +53,12 @@ class BiquadFilter {
     }
 }
 
-class AudioModel: ObservableObject {
-    @Published var decodedText: String = ""
-    @Published var isProcessing: Bool = false
-    @Published var isPlaying: Bool = false
-    @Published var isReadyToPlay: Bool = false
-    @Published var statusMessage: String = "Ready to load audio."
+public class AudioModel: ObservableObject {
+    @Published public var decodedText: String = ""
+    @Published public var isProcessing: Bool = false
+    @Published public var isPlaying: Bool = false
+    @Published public var isReadyToPlay: Bool = false
+    @Published public var statusMessage: String = "Ready to load audio."
 
     // Playback
     private var audioPlayer: AVAudioPlayer?
@@ -74,7 +74,7 @@ class AudioModel: ObservableObject {
     private let generator = AudioGenerator()
 
     // Live Capture
-    let captureManager = AudioCaptureManager()
+    public let captureManager = AudioCaptureManager()
     private let streamingDecoder = StreamingMorseDecoder()
 
     // Filter
@@ -89,7 +89,7 @@ class AudioModel: ObservableObject {
     private var liveIsSignalOn: Bool = false
     private var liveStateDurationFrames: Int = 0
 
-    init() {
+    public init() {
         captureManager.setAudioCallback { [weak self] buffer in
             self?.processLiveBuffer(buffer)
         }
@@ -104,7 +104,7 @@ class AudioModel: ObservableObject {
 
     private var cancellables = Set<AnyCancellable>()
 
-    func startLiveListening(window: SCWindow) async {
+    public func startLiveListening(window: SCWindow) async {
         self.stopAudio()
         self.decodedText = ""
         self.statusMessage =
@@ -132,7 +132,7 @@ class AudioModel: ObservableObject {
         }
     }
 
-    func stopLiveListening() async {
+    public func stopLiveListening() async {
         await captureManager.stopStream()
         DispatchQueue.main.async {
             self.isLiveListening = false
@@ -224,7 +224,7 @@ class AudioModel: ObservableObject {
         }
     }
 
-    func loadAndProcessAudio(url: URL) {
+    public func loadAndProcessAudio(url: URL) {
         self.isProcessing = true
         self.isReadyToPlay = false
         self.statusMessage = "Loading audio..."
@@ -285,12 +285,14 @@ class AudioModel: ObservableObject {
         }
     }
 
-    func generateAudio(from text: String, wpm: Double = 20.0, frequency: Double = 600.0) -> Data? {
+    public func generateAudio(from text: String, wpm: Double = 20.0, frequency: Double = 600.0)
+        -> Data?
+    {
         let events = encoder.encode(text: text, wpm: wpm)
         return generator.generateWAV(from: events, frequency: frequency)
     }
 
-    func playAudio() {
+    public func playAudio() {
         guard let player = audioPlayer, !player.isPlaying else { return }
 
         // Reset text state if starting from beginning
@@ -312,7 +314,7 @@ class AudioModel: ObservableObject {
             }
     }
 
-    func stopAudio() {
+    public func stopAudio() {
         audioPlayer?.stop()
         isPlaying = false
         playbackTimer?.cancel()

@@ -6,13 +6,31 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		65FF36CA2EFA424800BF870C /* CerkitCWCompanionLogic in Frameworks */ = {isa = PBXBuildFile; productRef = 65FF36C92EFA424800BF870C /* CerkitCWCompanionLogic */; };
+		65FF36CC2EFA424800BF870C /* ft8_lib in Frameworks */ = {isa = PBXBuildFile; productRef = 65FF36CB2EFA424800BF870C /* ft8_lib */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		6565159B2EF7CF1D00BB8EC6 /* cerkit CW Companion.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "cerkit CW Companion.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		65FF36CE2EFA44AD00BF870C /* Exceptions for "cerkit CW Companion" folder in "cerkit CW Companion" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"cerkit-CW-Companion-Info.plist",
+			);
+			target = 6565159A2EF7CF1D00BB8EC6 /* cerkit CW Companion */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		6565159D2EF7CF1D00BB8EC6 /* cerkit CW Companion */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				65FF36CE2EFA44AD00BF870C /* Exceptions for "cerkit CW Companion" folder in "cerkit CW Companion" target */,
+			);
 			path = "cerkit CW Companion";
 			sourceTree = "<group>";
 		};
@@ -23,6 +41,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				65FF36CA2EFA424800BF870C /* CerkitCWCompanionLogic in Frameworks */,
+				65FF36CC2EFA424800BF870C /* ft8_lib in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +85,8 @@
 			);
 			name = "cerkit CW Companion";
 			packageProductDependencies = (
+				65FF36C92EFA424800BF870C /* CerkitCWCompanionLogic */,
+				65FF36CB2EFA424800BF870C /* ft8_lib */,
 			);
 			productName = "cerkit CW Companion";
 			productReference = 6565159B2EF7CF1D00BB8EC6 /* cerkit CW Companion.app */;
@@ -94,6 +116,9 @@
 			);
 			mainGroup = 656515922EF7CF1D00BB8EC6;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				65FF36C82EFA424800BF870C /* XCLocalSwiftPackageReference "CerkitLibrary" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 6565159C2EF7CF1D00BB8EC6 /* Products */;
 			projectDirPath = "";
@@ -257,7 +282,7 @@
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
-				ENABLE_OUTGOING_NETWORK_CONNECTIONS = NO;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
 				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
@@ -268,7 +293,11 @@
 				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
 				ENABLE_RESOURCE_ACCESS_USB = NO;
 				ENABLE_USER_SELECTED_FILES = readwrite;
+				"GCC_PREPROCESSOR_DEFINITIONS[arch=*]" = "HAVE_STPCPY=1";
 				GENERATE_INFOPLIST_FILE = YES;
+				"HEADER_SEARCH_PATHS[arch=*]" = Libraries/ft8_lib/include;
+				INFOPLIST_FILE = "cerkit-CW-Companion-Info.plist";
+				INFOPLIST_KEY_LSApplicationCategoryType = "";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -299,7 +328,7 @@
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
-				ENABLE_OUTGOING_NETWORK_CONNECTIONS = NO;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
 				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
@@ -310,7 +339,11 @@
 				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
 				ENABLE_RESOURCE_ACCESS_USB = NO;
 				ENABLE_USER_SELECTED_FILES = readwrite;
+				"GCC_PREPROCESSOR_DEFINITIONS[arch=*]" = "HAVE_STPCPY=1";
 				GENERATE_INFOPLIST_FILE = YES;
+				"HEADER_SEARCH_PATHS[arch=*]" = Libraries/ft8_lib/include;
+				INFOPLIST_FILE = "cerkit-CW-Companion-Info.plist";
+				INFOPLIST_KEY_LSApplicationCategoryType = "";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -351,6 +384,24 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		65FF36C82EFA424800BF870C /* XCLocalSwiftPackageReference "CerkitLibrary" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = CerkitLibrary;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		65FF36C92EFA424800BF870C /* CerkitCWCompanionLogic */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CerkitCWCompanionLogic;
+		};
+		65FF36CB2EFA424800BF870C /* ft8_lib */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ft8_lib;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 656515932EF7CF1D00BB8EC6 /* Project object */;
 }
