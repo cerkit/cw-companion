@@ -17,30 +17,51 @@ public class FT8Engine: ObservableObject {
     private let sampleRate: Int = 12000
     private let slotTime: Double = 15.0  // FT8 cycle time
     private let samplesPerSlot: Int = 12000 * 15  // ~180,000
+    private var isAligned = false
 
     public init() {}
 
     public func appendAudio(_ samples: [Int16]) {
+        // Time Alignment Logic
+        if audioBuffer.isEmpty {
+            let now = Date()
+            let seconds = Calendar.current.component(.second, from: now)
+            // Allow 1 second window to latch onto the start of a slot (00, 15, 30, 45)
+            // Note: FT8 slots are 15s. We want to start buffer at :00, :15, :30, :45.
+            let remainder = seconds % 15
+            if remainder == 0 || remainder == 1 {
+                if !isAligned {
+                    print("FT8Engine: Aligned with time slot at \(now). Capturing...")
+                    isAligned = true
+                }
+            } else {
+                // Not aligned, drop data
+                if isAligned {
+                    isAligned = false
+                }
+                return
+            }
+        }
+
         audioBuffer.append(contentsOf: samples)
 
-        print(
-            "FT8Engine: Appending \(samples.count) samples. Total: \(audioBuffer.count). Target: \(samplesPerSlot)"
-        )
-
-        // Decode continuously or in chunks?
-        // FT8 is slotted. We should ideally wait for the buffer to fill (~15s)
         // Check if we have enough samples for a full cycle
         if audioBuffer.count >= samplesPerSlot {
             // Take the slot's worth of data
             let slotData = Array(audioBuffer.prefix(samplesPerSlot))
 
-            // Remove processed data (sliding window? or strict slots?)
+            // Remove processed data
             // FT8 slots are aligned to :00, :15, :30, :45.
-            // For this simple implementation, we just drain the buffer.
+            // For this simple implementation, we just drain the buffer and unalign to force re-sync
             audioBuffer.removeFirst(samplesPerSlot)
 
+            // Safer to reset alignment for now to re-lock every slot to wall clock.
+            audioBuffer.removeAll(keepingCapacity: true)
+            isAligned = false
+
             // Start slot logging
-            print("FT8Engine: Buffer full (\(audioBuffer.count) samples). Starting decode of slot.")
+            let now = Date()
+            print("FT8Engine: Buffer full. Decoding slot ending at \(now).")
 
             // Decode in background
             DispatchQueue.global(qos: .userInitiated).async {
@@ -67,15 +88,9 @@ public class FT8Engine: ObservableObject {
         monitor_init(&mon, &config)
 
         // 3. Process Audio Frames
-        // monitor_process expects blocks. We identify the block size from the initialized monitor.
-        // Usually block_size represents the number of new samples to ingest per step (often equal to nfft or hop_size)
-        // In kgoba/ft8_lib, it seems monitor_process takes 'block_size' samples.
-
         let blockSize = Int(mon.block_size)
         let sampleCount = floatSamples.count
 
-        // Ensure we don't read past end
-        // Simple processing loop
         var processedCount = 0
         floatSamples.withUnsafeBufferPointer { buffer in
             guard let basePtr = buffer.baseAddress else { return }
@@ -92,6 +107,7 @@ public class FT8Engine: ObservableObject {
         var candidates = [ftx_candidate_t](repeating: ftx_candidate_t(), count: maxCandidates)
 
         let numCandidates = ftx_find_candidates(&mon.wf, Int32(maxCandidates), &candidates, 10)  // min score 10
+        print("FT8Engine: Found \(numCandidates) candidates.")
 
         // 5. Decode Candidates
         var newMessages: [FT8Message] = []
@@ -108,16 +124,15 @@ public class FT8Engine: ObservableObject {
                 // Get Text
                 var textBuffer = [CChar](repeating: 0, count: 128)
                 // We don't have a hash interface implemented yet, pass nil
-                ftx_message_decode(&message, nil, &textBuffer, nil)
+                // Pass dummy offsets to prevent crash if library writes to it
+                var offsets = ftx_message_offsets_t()
+                ftx_message_decode(&message, nil, &textBuffer, &offsets)
 
                 let text = String(cString: textBuffer)
                 let _ =
                     Float(candidate.freq_offset)
                     * (Float(config.sample_rate) / 2.0 / Float(mon.wf.num_bins))
-                // This is rough frequency calc. monitor.c usually has helper or we reproduce logic:
-                // freq = (candidate.freq_offset + candidate.freq_sub / freq_osr) * tone_spacing + f_min
-                // Let's use status.freq if defined?
-                // decode.h struct has 'float freq' in ftx_decode_status_t!
+                // This is rough frequency calc.
 
                 let timestamp = Date()  // Now, or approximate slot time
 

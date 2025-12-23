@@ -140,11 +140,6 @@ public class KiwiClient: NSObject, ObservableObject {
             if let decoder = self.adpcmDecoder {
                 // Decode ADPCM
                 samples = decoder.decode(audioData)
-                if Int.random(in: 0...50) == 0 {
-                    print(
-                        "KiwiClient: Decoded ADPCM \(audioData.count) bytes -> \(samples.count) samples (RSSI: \(rssi))"
-                    )
-                }
             } else {
                 // Fallback simple cast (unlikely valid for ADPCM)
                 let sampleCount = audioData.count / 2
