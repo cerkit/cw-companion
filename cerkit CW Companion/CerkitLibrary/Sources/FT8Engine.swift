@@ -8,6 +8,7 @@ public struct FT8Message: Identifiable, Equatable {
     public let signal: Int  // dB
     public let frequency: Double  // Hz offset
     public let text: String
+    public let grid: String?
 }
 
 public class FT8Engine: ObservableObject {
@@ -136,11 +137,23 @@ public class FT8Engine: ObservableObject {
 
                 let timestamp = Date()  // Now, or approximate slot time
 
+                // Parse Grid Square
+                // Regex: 2 A-R, 2 0-9. e.g. "PL02", "FM18"
+                // Often at the end of message "CQ K1ABC FN42"
+                var extractedGrid: String? = nil
+                let gridPattern = "[A-R]{2}[0-9]{2}"
+
+                if let range = text.range(of: gridPattern, options: .regularExpression) {
+                    extractedGrid = String(text[range])
+                }
+
                 let msg = FT8Message(
                     timestamp: timestamp,
                     signal: Int(candidate.score),  // Score is roughly SNR/quality
                     frequency: Double(status.freq),
-                    text: text)
+                    text: text,
+                    grid: extractedGrid
+                )
                 newMessages.append(msg)
             }
         }

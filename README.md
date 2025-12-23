@@ -28,9 +28,11 @@ CW Companion is a macOS application designed for Morse Code (CW) enthusiasts. It
 *   **Language**: Swift 5.
 *   **UI Framework**: SwiftUI.
 *   **Audio Engine**: `AVFoundation` for low-level audio buffer manipulation/playback and `ScreenCaptureKit` for system audio streams.
+*   **DSP Engine**: Apple `Accelerate` (vDSP) for FFT calculations.
+*   **Rendering**: Apple `Metal` for high-performance waterfall visualization.
 *   **Concurrency**:
     *   Uses Swift structured concurrency (`async`/`await`) for managing live stream sessions.
-    *   Utilizes `DispatchQueue` and `Combine` pipelines to offload heavy DSP (Digital Signal Processing) tasks from the main UI thread.
+    *   Utilizes `DispatchQueue` and `Combine` pipelines to offload heavy DSP tasks.
 
 ## Usage
 
@@ -46,8 +48,18 @@ CW Companion is a macOS application designed for Morse Code (CW) enthusiasts. It
 3.  Adjust the WPM (Speed) and Frequency if desired.
 4.  Press **Play** to preview or **Save WAV** to export the audio file.
 
+### Cloud Receiver Mode
+1.  Go to the **Cloud** tab.
+2.  Select a receiver from the dropdown (e.g., "KPH San Francisco").
+3.  Click **Connect**. The waterfall will begin scrolling.
+4.  Wait for the 15-second FT8 cycle.
+5.  Decoded messages will appear in the list, and pins will drop on the map corresponding to the transmitter's location.
+
 ## Development
 
 *   **AudioProcessing.swift**: core logic for DSP, including the `BiquadFilter`, `AudioModel` state management, and the `processLiveBuffer` loop.
 *   **AudioCaptureManager.swift**: Handles the `ScreenCaptureKit` stream lifecycle and permission handling.
 *   **MorseDecoder.swift**: Logic for translating time intervals into characters.
+*   **FT8Engine.swift**: Wrapper around the C-based FT8 library (`ft8_lib`).
+*   **WaterfallRenderer.swift**: Metal-based renderer for the audio spectrogram.
+*   **MaidenheadLocator.swift**: Utility to convert Grid Squares to Lat/Long coordinates.

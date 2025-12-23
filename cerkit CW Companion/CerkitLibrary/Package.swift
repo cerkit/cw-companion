@@ -32,7 +32,8 @@ let package = Package(
                 "AudioCaptureManager.swift", "CloudReceiverView.swift",
                 "IMAADPCMDecoder.swift", "StreamAudioPlayer.swift",
                 "WaterfallRenderer.swift", "MetalWaterfallView.swift",
-                "AudioSpectrogram.swift",
+                "AudioSpectrogram.swift", "MaidenheadLocator.swift",
+                "WorldMapView.swift",
             ],
             resources: [
                 .process("Waterfall.metal")
