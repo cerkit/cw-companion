@@ -3,11 +3,11 @@ import Combine
 import Foundation
 import ScreenCaptureKit
 
-struct SimpleWindow: Identifiable, Hashable {
-    let id: Int
-    let name: String
+public struct SimpleWindow: Identifiable, Hashable {
+    public let id: Int
+    public let name: String
 
-    init(window: SCWindow) {
+    public init(window: SCWindow) {
         self.id = Int(window.windowID)
         let app = window.owningApplication?.applicationName ?? "Unknown App"
         let title = window.title ?? "Untitled"
@@ -15,11 +15,11 @@ struct SimpleWindow: Identifiable, Hashable {
     }
 }
 
-class AudioCaptureManager: NSObject, ObservableObject {
-    @Published var availableWindows: [SimpleWindow] = []
-    @Published var availableDisplays: [SCDisplay] = []
-    @Published var isRecording: Bool = false
-    @Published var permissionError: Bool = false
+public class AudioCaptureManager: NSObject, ObservableObject {
+    @Published public var availableWindows: [SimpleWindow] = []
+    @Published public var availableDisplays: [SCDisplay] = []
+    @Published public var isRecording: Bool = false
+    @Published public var permissionError: Bool = false
 
     // Internal cache for starting stream
     private var rawWindows: [SCWindow] = []
@@ -27,15 +27,15 @@ class AudioCaptureManager: NSObject, ObservableObject {
     private var stream: SCStream?
     private var audioCallback: ((AVAudioPCMBuffer) -> Void)?
 
-    override init() {
+    public override init() {
         super.init()
     }
 
-    func setAudioCallback(_ callback: @escaping (AVAudioPCMBuffer) -> Void) {
+    public func setAudioCallback(_ callback: @escaping (AVAudioPCMBuffer) -> Void) {
         self.audioCallback = callback
     }
 
-    func refreshAvailableContent() async {
+    public func refreshAvailableContent() async {
         do {
             // Fetch everything first to debug
             let content = try await SCShareableContent.excludingDesktopWindows(
@@ -69,7 +69,7 @@ class AudioCaptureManager: NSObject, ObservableObject {
         }
     }
 
-    func startStream(window: SCWindow) async throws {
+    public func startStream(window: SCWindow) async throws {
         let filter = SCContentFilter(desktopIndependentWindow: window)
 
         let config = SCStreamConfiguration()
@@ -98,7 +98,7 @@ class AudioCaptureManager: NSObject, ObservableObject {
         }
     }
 
-    func stopStream() async {
+    public func stopStream() async {
         if let stream = stream {
             try? await stream.stopCapture()
         }
@@ -108,13 +108,13 @@ class AudioCaptureManager: NSObject, ObservableObject {
         }
     }
 
-    func getRawWindow(id: Int) -> SCWindow? {
+    public func getRawWindow(id: Int) -> SCWindow? {
         return rawWindows.first(where: { Int($0.windowID) == id })
     }
 }
 
 extension AudioCaptureManager: SCStreamOutput {
-    func stream(
+    public func stream(
         _ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer,
         of type: SCStreamOutputType
     ) {
