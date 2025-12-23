@@ -35,6 +35,8 @@ CW Companion is a macOS application designed for Morse Code (CW) enthusiasts. It
     *   **Live Visualization**: Plots decoded stations on an interactive **Apple Map** using the extracted grid squares.
     *   **Split-View Dashboard**: Professional monitoring layout with Map on the left and Waterfall/Data on the right.
 
+    ![FT-8 Decoder Screenshot](https://github.com/cerkit/cw-companion/blob/main/ft-8-user-interface-with-map.png?raw=true)
+
 ## Technical Architecture
 
 *   **Platform**: macOS 12.3+ (Required for `ScreenCaptureKit`).
