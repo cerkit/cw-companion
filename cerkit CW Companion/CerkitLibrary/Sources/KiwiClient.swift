@@ -23,6 +23,7 @@ public class KiwiClient: NSObject, ObservableObject {
     private var urlSession: URLSession!
     private var sessionID: String = ""
     private var hasRequestedAudio: Bool = false
+    private let adpcmDecoder: IMAADPCMDecoder? = IMAADPCMDecoder()
 
     public init(host: String, port: Int) {
         self.host = host
@@ -113,35 +114,48 @@ public class KiwiClient: NSObject, ObservableObject {
 
     private func handleBinaryMessage(_ data: Data) {
         // KiwiSDR binary protocol:
-        // First 3 bytes are command: "SND" (spectrum) or "MSG" (audio/metadata)
+        // First 3 bytes are command: "SND" (audio) or "MSG" (metadata)
 
         guard data.count > 3 else { return }
 
         let prefix = String(decoding: data.prefix(3), as: UTF8.self)
 
         if prefix == "SND" {
-            // Audio data format: "SND" (3) + flags (1) + seq (4) + samples (...)
-            // This is the main audio stream!
+            // "SND " (4 bytes) + Seq (4 bytes) + Smeter (2 bytes) + Data
+            // Expected Header Size: 10 bytes (including SND+space)
 
-            guard data.count > 8 else { return }
-
-            // Skip header (8 bytes)
-            let sampleData = data.dropFirst(8)
-            let sampleCount = sampleData.count / 2
-
-            // Trace logging (sampled)
-            if Int.random(in: 0...50) == 0 {
-                print("KiwiClient: Received audio chunk (SND) with \(sampleCount) samples")
+            guard data.count > 10 else {
+                print("KiwiClient: SND packet too small (\(data.count) bytes)")
+                return
             }
 
-            var samples = [Int16](repeating: 0, count: sampleCount)
+            // Extract RSSI (Bytes 8-9, Little Endian)
+            let rssiData = data.subdata(in: 8..<10)
+            let rssi = rssiData.withUnsafeBytes { $0.load(as: Int16.self) }
 
-            sampleData.withUnsafeBytes { bufferPointer in
-                if let baseAddress = bufferPointer.baseAddress {
-                    let rawPointer = baseAddress.assumingMemoryBound(to: UInt16.self)
-                    for i in 0..<sampleCount {
-                        let point = rawPointer[i]
-                        samples[i] = Int16(bitPattern: UInt16(bigEndian: point))
+            // Extract Audio Data (Bytes 10...)
+            let audioData = data.dropFirst(10)
+
+            var samples: [Int16]
+            if let decoder = self.adpcmDecoder {
+                // Decode ADPCM
+                samples = decoder.decode(audioData)
+                if Int.random(in: 0...50) == 0 {
+                    print(
+                        "KiwiClient: Decoded ADPCM \(audioData.count) bytes -> \(samples.count) samples (RSSI: \(rssi))"
+                    )
+                }
+            } else {
+                // Fallback simple cast (unlikely valid for ADPCM)
+                let sampleCount = audioData.count / 2
+                samples = [Int16](repeating: 0, count: sampleCount)
+                audioData.withUnsafeBytes { rawBuffer in
+                    if let baseAddress = rawBuffer.baseAddress {
+                        let rawPointer = baseAddress.assumingMemoryBound(to: UInt16.self)
+                        for i in 0..<sampleCount {
+                            let point = rawPointer[i]
+                            samples[i] = Int16(bitPattern: UInt16(littleEndian: point))
+                        }
                     }
                 }
             }
@@ -154,7 +168,6 @@ public class KiwiClient: NSObject, ObservableObject {
             // Format: "MSG" (3) + ?
 
             // Try to decode the whole thing as string (ignoring first 3 bytes 'MSG')
-            // Or just print everything
             if let stringContent = String(data: data.dropFirst(4), encoding: .utf8) {
                 print("KiwiClient: Received MSG packet: '\(stringContent)'")
 

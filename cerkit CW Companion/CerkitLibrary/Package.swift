@@ -30,6 +30,7 @@ let package = Package(
                 "MorseDecoder.swift", "AudioProcessing.swift", "KiwiClient.swift",
                 "FT8Engine.swift", "MorseEncoder.swift", "AudioGenerator.swift",
                 "AudioCaptureManager.swift", "CloudReceiverView.swift",
+                "IMAADPCMDecoder.swift", "StreamAudioPlayer.swift",
             ]
         ),
         .testTarget(

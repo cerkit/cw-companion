@@ -4,6 +4,7 @@ import SwiftUI
 public struct CloudReceiverView: View {
     @StateObject private var kiwiClient = KiwiClient(host: "kphsdr.com", port: 8073)  // Default KPH
     @StateObject private var ft8Engine = FT8Engine()
+    @StateObject private var audioPlayer = StreamAudioPlayer()
     @State private var cancellables = Set<AnyCancellable>()
 
     public init() {
@@ -121,6 +122,7 @@ public struct CloudReceiverView: View {
                 .receive(on: DispatchQueue.main)  // Or background queue for performance
                 .sink { samples in
                     ft8Engine.appendAudio(samples)
+                    audioPlayer.ingest(samples: samples)
                 }
                 .store(in: &cancellables)
         }

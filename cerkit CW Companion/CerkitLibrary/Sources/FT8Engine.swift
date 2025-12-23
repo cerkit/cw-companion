@@ -14,14 +14,18 @@ public class FT8Engine: ObservableObject {
     @Published public var decodedMessages: [FT8Message] = []
 
     private var audioBuffer: [Int16] = []
-    private let sampleRate: Int32 = 12000
+    private let sampleRate: Int = 12000
     private let slotTime: Double = 15.0  // FT8 cycle time
-    private let samplesPerSlot = 12000 * 15  // ~180,000
+    private let samplesPerSlot: Int = 12000 * 15  // ~180,000
 
     public init() {}
 
     public func appendAudio(_ samples: [Int16]) {
         audioBuffer.append(contentsOf: samples)
+
+        print(
+            "FT8Engine: Appending \(samples.count) samples. Total: \(audioBuffer.count). Target: \(samplesPerSlot)"
+        )
 
         // Decode continuously or in chunks?
         // FT8 is slotted. We should ideally wait for the buffer to fill (~15s)
